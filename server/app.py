@@ -1,13 +1,18 @@
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from ..models import EmailAction, EmailObservation, EmailState, StepResult, TaskDefinition
+    from ..server.environment import EmailEnvironment, TASKS
+except ImportError:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from models import EmailAction, EmailObservation, EmailState, StepResult, TaskDefinition
+    from server.environment import EmailEnvironment, TASKS
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
-from models import EmailAction, EmailObservation, EmailState, StepResult, TaskDefinition
-from server.environment import EmailEnvironment, TASKS
 from typing import List, Dict, Any
 import time
 
@@ -40,8 +45,14 @@ def root():
         "version": "1.0.0",
         "status": "running",
         "openenv": True,
-        "endpoints": ["/reset", "/step", "/state", "/tasks", "/metrics", "/simulate", "/grader"],
+        "endpoints": ["/reset", "/step", "/state", "/tasks", "/health", "/metrics", "/grader"],
     })
+
+
+@app.get("/health")
+def health():
+    """Health check endpoint — required by OpenEnv spec."""
+    return JSONResponse({"status": "healthy"})
 
 
 @app.get("/demo", response_class=FileResponse)
@@ -49,20 +60,18 @@ def demo():
     return FileResponse(os.path.join(_static_dir, "index.html"))
 
 
-@app.api_route("/reset", methods=["GET", "POST", "PUT"])
+@app.api_route("/reset", methods=["GET", "POST", "PUT", "OPTIONS"])
 async def reset(request: Request):
     """
-    OpenEnv reset endpoint.
-    Accepts GET, POST (empty body, JSON body, form data).
+    POST /reset — OpenEnv spec compliant.
     Returns initial observation as JSON.
     """
     global _env, _metrics_log
     task_id = 2
 
-    # Try to parse body
     try:
         body = await request.body()
-        if body:
+        if body and len(body) > 0:
             import json
             data = json.loads(body)
             if isinstance(data, dict):
@@ -70,7 +79,6 @@ async def reset(request: Request):
     except Exception:
         pass
 
-    # Try query param
     try:
         qp = request.query_params.get("task_id")
         if qp:
@@ -83,10 +91,8 @@ async def reset(request: Request):
     _metrics_log = []
     obs = _env.reset()
 
-    # Return flat dict — no nested Pydantic models
-    return JSONResponse(
-        status_code=200,
-        content={
+    return JSONResponse(status_code=200, content={
+        "observation": {
             "email_id": obs.email_id,
             "subject": obs.subject,
             "body": obs.body,
@@ -99,13 +105,15 @@ async def reset(request: Request):
             "user_stress_level": obs.user_stress_level,
             "time_remaining": obs.time_remaining,
             "step_count": obs.step_count,
-        }
-    )
+        },
+        "reward": 0.0,
+        "done": False,
+        "info": {"task_id": task_id}
+    })
 
 
-@app.post("/step")
+@app.api_route("/step", methods=["POST", "PUT"])
 async def step(request: Request):
-    """Accept step action — flexible parsing."""
     global _metrics_log
     try:
         body = await request.json()
@@ -125,7 +133,7 @@ async def step(request: Request):
             obs_data = result.observation.model_dump()
         return JSONResponse(content={
             "observation": obs_data,
-            "reward": result.reward.model_dump(),
+            "reward": result.reward.total,
             "done": result.done,
             "info": result.info,
         })
@@ -174,9 +182,8 @@ async def simulate(request: Request):
     task_id = 2
     policy = "random"
     try:
-        qp = request.query_params
-        task_id = int(qp.get("task_id", 2))
-        policy = qp.get("policy", "random")
+        task_id = int(request.query_params.get("task_id", 2))
+        policy = request.query_params.get("policy", "random")
     except Exception:
         pass
 
