@@ -2,13 +2,13 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from models import EmailAction, EmailObservation, EmailState, StepResult, TaskDefinition
 from server.environment import EmailEnvironment, TASKS
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import time
 
 app = FastAPI(
@@ -24,20 +24,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve static demo UI
 _static_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
 if os.path.isdir(_static_dir):
     app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
-# Global environment instance
 _env = EmailEnvironment(task_id=2)
 _start_time = time.time()
 _metrics_log: List[Dict] = []
 
 
+def _do_reset(task_id: int = 2):
+    global _env, _metrics_log
+    _env = EmailEnvironment(task_id=task_id)
+    _metrics_log = []
+    obs = _env.reset()
+    return JSONResponse(content=obs.model_dump())
+
+
 @app.get("/")
 def root():
-    """Health check + API index. Returns 200 for OpenEnv ping validation."""
     return JSONResponse({
         "name": "Autonomous Inbox OS",
         "version": "1.0.0",
@@ -49,17 +54,32 @@ def root():
 
 @app.get("/demo", response_class=FileResponse)
 def demo():
-    """Serve the interactive demo UI."""
     return FileResponse(os.path.join(_static_dir, "index.html"))
 
 
 @app.post("/reset")
-def reset(task_id: int = Query(default=2, ge=1, le=3)) -> EmailObservation:
-    global _env, _metrics_log
-    _env = EmailEnvironment(task_id=task_id)
-    _metrics_log = []
-    obs = _env.reset()
-    return obs
+async def reset(request: Request):
+    """POST /reset — OpenEnv spec. Accepts empty body or JSON with task_id."""
+    task_id = 2
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            task_id = int(body.get("task_id", 2))
+    except Exception:
+        pass
+    qp = request.query_params.get("task_id")
+    if qp:
+        try:
+            task_id = int(qp)
+        except Exception:
+            pass
+    task_id = max(1, min(3, task_id))
+    return _do_reset(task_id)
+
+
+@app.get("/reset")
+def reset_get(task_id: int = Query(default=2, ge=1, le=3)):
+    return _do_reset(task_id)
 
 
 @app.post("/step")
@@ -89,13 +109,11 @@ def get_tasks() -> List[TaskDefinition]:
 
 @app.get("/grader")
 def grader() -> Dict[str, Any]:
-    """Run the programmatic grader on the current episode."""
     return _env.run_grader()
 
 
 @app.get("/metrics")
 def metrics() -> Dict[str, Any]:
-    """Return live metrics for dashboard."""
     s = _env.state()
     return {
         "episode_id": s.episode_id,
@@ -117,7 +135,6 @@ def simulate(
     task_id: int = Query(default=2, ge=1, le=3),
     policy: str = Query(default="random")
 ) -> Dict[str, Any]:
-    """Run a full episode with a built-in policy (for testing/demo)."""
     import random
     from models import ActionType, Priority
 
@@ -125,27 +142,16 @@ def simulate(
     env.reset()
     total_reward = 0.0
     steps = 0
-
     actions_map = list(ActionType)
     labels_map = list(Priority)
 
     while not env._done:
         if policy == "random":
-            action = EmailAction(
-                action_type=random.choice(actions_map),
-                classification=random.choice(labels_map),
-            )
+            action = EmailAction(action_type=random.choice(actions_map), classification=random.choice(labels_map))
         elif policy == "always_important":
-            action = EmailAction(
-                action_type=ActionType.reply,
-                classification=Priority.important,
-            )
+            action = EmailAction(action_type=ActionType.reply, classification=Priority.important)
         else:
-            action = EmailAction(
-                action_type=ActionType.archive,
-                classification=Priority.spam,
-            )
-
+            action = EmailAction(action_type=ActionType.archive, classification=Priority.spam)
         result = env.step(action)
         total_reward += result.reward.total
         steps += 1
