@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from models import EmailAction, EmailObservation, EmailState, StepResult, TaskDefinition
 from server.environment import EmailEnvironment, TASKS
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import time
 
 app = FastAPI(
@@ -33,14 +33,6 @@ _start_time = time.time()
 _metrics_log: List[Dict] = []
 
 
-def _do_reset(task_id: int = 2):
-    global _env, _metrics_log
-    _env = EmailEnvironment(task_id=task_id)
-    _metrics_log = []
-    obs = _env.reset()
-    return JSONResponse(content=obs.model_dump())
-
-
 @app.get("/")
 def root():
     return JSONResponse({
@@ -48,7 +40,7 @@ def root():
         "version": "1.0.0",
         "status": "running",
         "openenv": True,
-        "endpoints": ["/reset", "/step", "/state", "/tasks", "/metrics", "/simulate", "/grader", "/demo"],
+        "endpoints": ["/reset", "/step", "/state", "/tasks", "/metrics", "/simulate", "/grader"],
     })
 
 
@@ -57,33 +49,69 @@ def demo():
     return FileResponse(os.path.join(_static_dir, "index.html"))
 
 
-@app.post("/reset")
+@app.api_route("/reset", methods=["GET", "POST", "PUT"])
 async def reset(request: Request):
-    """POST /reset — OpenEnv spec. Accepts empty body or JSON with task_id."""
+    """
+    OpenEnv reset endpoint.
+    Accepts GET, POST (empty body, JSON body, form data).
+    Returns initial observation as JSON.
+    """
+    global _env, _metrics_log
     task_id = 2
+
+    # Try to parse body
     try:
-        body = await request.json()
-        if isinstance(body, dict):
-            task_id = int(body.get("task_id", 2))
+        body = await request.body()
+        if body:
+            import json
+            data = json.loads(body)
+            if isinstance(data, dict):
+                task_id = int(data.get("task_id", 2))
     except Exception:
         pass
-    qp = request.query_params.get("task_id")
-    if qp:
-        try:
+
+    # Try query param
+    try:
+        qp = request.query_params.get("task_id")
+        if qp:
             task_id = int(qp)
-        except Exception:
-            pass
+    except Exception:
+        pass
+
     task_id = max(1, min(3, task_id))
-    return _do_reset(task_id)
+    _env = EmailEnvironment(task_id=task_id)
+    _metrics_log = []
+    obs = _env.reset()
 
-
-@app.get("/reset")
-def reset_get(task_id: int = Query(default=2, ge=1, le=3)):
-    return _do_reset(task_id)
+    # Return flat dict — no nested Pydantic models
+    return JSONResponse(
+        status_code=200,
+        content={
+            "email_id": obs.email_id,
+            "subject": obs.subject,
+            "body": obs.body,
+            "sender": obs.sender,
+            "has_attachment": obs.has_attachment,
+            "meeting_request": obs.meeting_request,
+            "inbox_size": obs.inbox_size,
+            "pending_urgent": obs.pending_urgent,
+            "pending_important": obs.pending_important,
+            "user_stress_level": obs.user_stress_level,
+            "time_remaining": obs.time_remaining,
+            "step_count": obs.step_count,
+        }
+    )
 
 
 @app.post("/step")
-def step(action: EmailAction) -> StepResult:
+async def step(request: Request):
+    """Accept step action — flexible parsing."""
+    global _metrics_log
+    try:
+        body = await request.json()
+        action = EmailAction(**body)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
     try:
         result = _env.step(action)
         _metrics_log.append({
@@ -92,30 +120,38 @@ def step(action: EmailAction) -> StepResult:
             "stress": _env._stress,
             "action": action.action_type.value,
         })
-        return result
+        obs_data = None
+        if result.observation:
+            obs_data = result.observation.model_dump()
+        return JSONResponse(content={
+            "observation": obs_data,
+            "reward": result.reward.model_dump(),
+            "done": result.done,
+            "info": result.info,
+        })
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/state")
-def state() -> EmailState:
-    return _env.state()
+def state():
+    return JSONResponse(content=_env.state().model_dump())
 
 
 @app.get("/tasks")
-def get_tasks() -> List[TaskDefinition]:
-    return TASKS
+def get_tasks():
+    return JSONResponse(content=[t.model_dump() for t in TASKS])
 
 
 @app.get("/grader")
-def grader() -> Dict[str, Any]:
-    return _env.run_grader()
+def grader():
+    return JSONResponse(content=_env.run_grader())
 
 
 @app.get("/metrics")
-def metrics() -> Dict[str, Any]:
+def metrics():
     s = _env.state()
-    return {
+    return JSONResponse(content={
         "episode_id": s.episode_id,
         "step_count": s.step_count,
         "inbox_size": s.inbox_size,
@@ -127,16 +163,22 @@ def metrics() -> Dict[str, Any]:
         "cumulative_reward": s.cumulative_reward,
         "uptime_seconds": round(time.time() - _start_time, 1),
         "recent_steps": _metrics_log[-10:] if _metrics_log else [],
-    }
+    })
 
 
-@app.post("/simulate")
-def simulate(
-    task_id: int = Query(default=2, ge=1, le=3),
-    policy: str = Query(default="random")
-) -> Dict[str, Any]:
+@app.api_route("/simulate", methods=["GET", "POST"])
+async def simulate(request: Request):
     import random
     from models import ActionType, Priority
+
+    task_id = 2
+    policy = "random"
+    try:
+        qp = request.query_params
+        task_id = int(qp.get("task_id", 2))
+        policy = qp.get("policy", "random")
+    except Exception:
+        pass
 
     env = EmailEnvironment(task_id=task_id)
     env.reset()
@@ -148,8 +190,6 @@ def simulate(
     while not env._done:
         if policy == "random":
             action = EmailAction(action_type=random.choice(actions_map), classification=random.choice(labels_map))
-        elif policy == "always_important":
-            action = EmailAction(action_type=ActionType.reply, classification=Priority.important)
         else:
             action = EmailAction(action_type=ActionType.archive, classification=Priority.spam)
         result = env.step(action)
@@ -159,11 +199,11 @@ def simulate(
             break
 
     grader_result = env.run_grader()
-    return {
+    return JSONResponse(content={
         "policy": policy,
         "task_id": task_id,
         "steps": steps,
         "total_reward": round(total_reward, 4),
         "grader_score": grader_result["score"],
         "details": grader_result["details"],
-    }
+    })
