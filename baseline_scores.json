@@ -1,0 +1,51 @@
+{
+  "model": "HuggingFaceH4/zephyr-7b-beta",
+  "results": [
+    {
+      "task_id": 1,
+      "score": 0.6183,
+      "details": {
+        "emails_processed": 7,
+        "label_accuracy": 0.4286,
+        "action_accuracy": 0.5714,
+        "missed_urgent": 0,
+        "final_stress": 0.0,
+        "cumulative_reward": 2.555,
+        "avg_reward_per_step": 0.365
+      },
+      "steps": 7,
+      "total_reward": 2.555
+    },
+    {
+      "task_id": 2,
+      "score": 0.1599,
+      "details": {
+        "emails_processed": 15,
+        "label_accuracy": 0.2,
+        "action_accuracy": 0.2667,
+        "missed_urgent": 4,
+        "final_stress": 0.48,
+        "cumulative_reward": -7.379,
+        "avg_reward_per_step": -0.4919
+      },
+      "steps": 15,
+      "total_reward": -7.379
+    },
+    {
+      "task_id": 3,
+      "score": 0.0714,
+      "details": {
+        "emails_processed": 19,
+        "label_accuracy": 0.1579,
+        "action_accuracy": 0.2105,
+        "missed_urgent": 8,
+        "final_stress": 1.0,
+        "cumulative_reward": -18.055,
+        "avg_reward_per_step": -0.9503
+      },
+      "steps": 19,
+      "total_reward": -18.055
+    }
+  ],
+  "average_score": 0.2832
+}

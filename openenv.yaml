@@ -1,0 +1,91 @@
+name: autonomous_inbox_os
+version: "1.0.0"
+description: >
+  Autonomous Inbox OS — an AI agent simulation environment where
+  an agent manages a flooded executive inbox under real-world constraints:
+  time pressure, cognitive load (stress), conflicting priorities, and
+  multi-step decision-making. Not just classification — full inbox management.
+
+author: "Hackathon Submission"
+tags:
+  - openenv
+  - email
+  - triage
+  - decision-making
+  - real-world
+
+tasks:
+  - id: 1
+    name: "Spam Detection"
+    difficulty: easy
+    description: "Identify and archive spam emails. Binary classification task."
+  - id: 2
+    name: "Inbox Prioritization"
+    difficulty: medium
+    description: "Classify all emails by priority and take the correct action for each."
+  - id: 3
+    name: "Executive Decision-Making Under Pressure"
+    difficulty: hard
+    description: "Handle a flooded inbox with conflicting priorities under time and stress pressure."
+
+observation_space:
+  email_id: int
+  subject: str
+  body: str
+  sender: str
+  has_attachment: bool
+  meeting_request: bool
+  inbox_size: int
+  pending_urgent: int
+  pending_important: int
+  user_stress_level: float  # 0.0 - 1.0
+  time_remaining: int
+  step_count: int
+
+action_space:
+  action_type:
+    type: enum
+    values: [classify, reply, escalate, archive, schedule, ignore]
+  classification:
+    type: enum
+    values: [urgent, important, low_priority, spam]
+    optional: true
+  reply_text:
+    type: str
+    optional: true
+  escalate_to:
+    type: str
+    optional: true
+  scheduled_time:
+    type: str
+    optional: true
+  reasoning:
+    type: str
+    optional: true
+
+reward:
+  type: float
+  range: [-3.0, 2.0]
+  description: >
+    Dense reward combining classification accuracy (0.35),
+    action correctness (0.35), reply quality (0.20),
+    time penalty (-0.05/step), stress penalty (dynamic),
+    and missed-urgent penalty (-2.0).
+
+environment:
+  reset_endpoint: POST /reset
+  step_endpoint: POST /step
+  state_endpoint: GET /state
+  tasks_endpoint: GET /tasks
+  grader_endpoint: GET /grader
+  metrics_endpoint: GET /metrics
+  simulate_endpoint: POST /simulate
+
+inference:
+  script: inference.py
+  required_env_vars:
+    - API_BASE_URL
+    - MODEL_NAME
+    - HF_TOKEN
+  max_runtime_minutes: 20
+  hardware: "2vCPU, 8GB RAM"
