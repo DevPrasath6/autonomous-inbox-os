@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Union
+from typing import Dict, Any
 from enum import Enum
 
 
@@ -36,11 +36,11 @@ class EmailObservation(BaseModel):
 
 class EmailAction(BaseModel):
     action_type: ActionType
-    classification: Priority = Field(default=Priority.low_priority)
-    reply_text: str = Field(default="")
-    escalate_to: str = Field(default="")
-    scheduled_time: str = Field(default="")
-    reasoning: str = Field(default="")
+    classification: Priority = Priority.low_priority
+    reply_text: str = ""
+    escalate_to: str = ""
+    scheduled_time: str = ""
+    reasoning: str = ""
 
 
 class EmailReward(BaseModel):
@@ -72,7 +72,7 @@ class TaskDefinition(BaseModel):
     name: str
     description: str
     difficulty: str
-    email_filter: str = Field(default="")
+    email_filter: str = ""
 
 
 class TaskResult(BaseModel):
@@ -82,7 +82,9 @@ class TaskResult(BaseModel):
 
 
 class StepResult(BaseModel):
-    observation: EmailObservation = Field(default=None)
+    observation: EmailObservation = EmailObservation(
+        email_id=0, subject="", body="", sender=""
+    )
     reward: EmailReward
     done: bool
     info: Dict[str, Any] = {}
