@@ -45,13 +45,58 @@ def root():
         "version": "1.0.0",
         "status": "running",
         "openenv": True,
-        "endpoints": ["/reset", "/step", "/state", "/tasks", "/health", "/metrics", "/grader"],
+        "endpoints": [
+            "/reset", "/step", "/state", "/tasks", "/health", "/metrics", "/grader",
+            "/metadata", "/schema", "/mcp"
+        ],
     })
 
 
 @app.get("/health")
 def health():
     return JSONResponse({"status": "healthy"})
+
+
+@app.get("/metadata")
+def metadata():
+    return JSONResponse({
+        "name": "autonomous_inbox_os",
+        "description": "OpenEnv-compliant AI email triage environment",
+        "version": "1.0.0",
+    })
+
+
+@app.get("/schema")
+def schema():
+    return JSONResponse({
+        "action": EmailAction.model_json_schema(),
+        "observation": EmailObservation.model_json_schema(),
+        "state": EmailState.model_json_schema(),
+    })
+
+
+@app.post("/mcp")
+async def mcp(request: Request):
+    payload = await request.json()
+    method = payload.get("method")
+    request_id = payload.get("id")
+
+    if method == "initialize":
+        return JSONResponse({
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "serverInfo": {"name": "autonomous_inbox_os", "version": "1.0.0"},
+                "capabilities": {},
+            },
+        })
+
+    return JSONResponse({
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "error": {"code": -32601, "message": f"Method not found: {method}"},
+    })
 
 
 @app.get("/demo", response_class=FileResponse)
