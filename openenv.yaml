@@ -38,7 +38,7 @@ observation_space:
   inbox_size: int
   pending_urgent: int
   pending_important: int
-  user_stress_level: float  # 0.0 - 1.0
+  user_stress_level: float
   time_remaining: int
   step_count: int
 
