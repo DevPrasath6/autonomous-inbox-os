@@ -43,25 +43,12 @@ observation_space:
   step_count: int
 
 action_space:
-  action_type:
-    type: enum
-    values: [classify, reply, escalate, archive, schedule, ignore]
-  classification:
-    type: enum
-    values: [urgent, important, low_priority, spam]
-    optional: true
-  reply_text:
-    type: str
-    optional: true
-  escalate_to:
-    type: str
-    optional: true
-  scheduled_time:
-    type: str
-    optional: true
-  reasoning:
-    type: str
-    optional: true
+  action_type: str
+  classification: str
+  reply_text: str
+  escalate_to: str
+  scheduled_time: str
+  reasoning: str
 
 reward:
   type: float
