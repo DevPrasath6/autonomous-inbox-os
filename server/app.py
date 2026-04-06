@@ -60,52 +60,44 @@ def demo():
     return FileResponse(os.path.join(_static_dir, "index.html"))
 
 
-@app.api_route("/reset", methods=["GET", "POST", "PUT", "OPTIONS"])
+@app.post("/reset")
 async def reset(request: Request):
-    """
-    POST /reset — OpenEnv spec compliant.
-    Returns initial observation as JSON.
-    """
+    """POST /reset — OpenEnv spec. Accepts empty body or JSON with task_id."""
     global _env, _metrics_log
     task_id = 2
-
     try:
-        body = await request.body()
-        if body and len(body) > 0:
-            import json
-            data = json.loads(body)
-            if isinstance(data, dict):
-                task_id = int(data.get("task_id", 2))
+        body = await request.json()
+        if isinstance(body, dict):
+            task_id = int(body.get("task_id", 2))
     except Exception:
         pass
-
-    try:
-        qp = request.query_params.get("task_id")
-        if qp:
+    qp = request.query_params.get("task_id")
+    if qp:
+        try:
             task_id = int(qp)
-    except Exception:
-        pass
-
+        except Exception:
+            pass
     task_id = max(1, min(3, task_id))
     _env = EmailEnvironment(task_id=task_id)
     _metrics_log = []
     obs = _env.reset()
-
     return JSONResponse(status_code=200, content={
-        "observation": {
-            "email_id": obs.email_id,
-            "subject": obs.subject,
-            "body": obs.body,
-            "sender": obs.sender,
-            "has_attachment": obs.has_attachment,
-            "meeting_request": obs.meeting_request,
-            "inbox_size": obs.inbox_size,
-            "pending_urgent": obs.pending_urgent,
-            "pending_important": obs.pending_important,
-            "user_stress_level": obs.user_stress_level,
-            "time_remaining": obs.time_remaining,
-            "step_count": obs.step_count,
-        },
+        "observation": obs.model_dump(),
+        "reward": 0.0,
+        "done": False,
+        "info": {"task_id": task_id}
+    })
+
+
+@app.get("/reset")
+def reset_get(task_id: int = Query(default=2, ge=1, le=3)):
+    """GET /reset — OpenEnv spec. Accepts task_id as query param."""
+    global _env, _metrics_log
+    _env = EmailEnvironment(task_id=task_id)
+    _metrics_log = []
+    obs = _env.reset()
+    return JSONResponse(status_code=200, content={
+        "observation": obs.model_dump(),
         "reward": 0.0,
         "done": False,
         "info": {"task_id": task_id}
