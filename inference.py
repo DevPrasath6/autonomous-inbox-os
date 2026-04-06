@@ -18,7 +18,7 @@ import os
 import json
 import time
 import sys
-from typing import List, Optional
+from typing import List
 from openai import OpenAI
 
 # ── Config ───────────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
 
 
-def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
+def log_step(step: int, action: str, reward: float, done: bool, error: str) -> None:
     error_val = error if error else "null"
     done_val = str(done).lower()
     print(f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}", flush=True)
