@@ -889,7 +889,7 @@
 
   <!-- Hero -->
   <div class="hero">
-    <div class="hero-tag">⚡ OpenEnv Hackathon 2025</div>
+    <div class="hero-tag">⚡ OpenEnv Hackathon 2026</div>
     <h1>AI that <span class="accent">manages</span><br>inbox <span class="accent2">chaos</span></h1>
     <p class="hero-sub">Not just classification — decision-making under time pressure, cognitive load, and conflicting priorities.</p>
   </div>
@@ -1129,7 +1129,7 @@ function agentDecide(email, stress) {
     escalate: { action_type:"escalate", classification: label, reasoning:"High-priority item requiring immediate attention and delegation." },
     archive: { action_type:"archive", classification: label, reasoning:"Low-value or junk email — archiving to reduce noise." },
     reply: { action_type:"reply", classification: label, reply_text:"Thank you for your email. I will review this and get back to you shortly.", reasoning:"Requires a direct response to maintain communication." },
-    schedule: { action_type:"schedule", classification: label, scheduled_time:"2025-11-15T15:00", reasoning:"Meeting request detected — scheduling on calendar." },
+    schedule: { action_type:"schedule", classification: label, scheduled_time:"2026-11-15T15:00", reasoning:"Meeting request detected — scheduling on calendar." },
   };
 
   const decisionAction = correct ? expected : shuffleAction(expected);
