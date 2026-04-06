@@ -1,0 +1,16 @@
+version = 1
+requires-python = ">=3.10"
+
+[[package]]
+name = "autonomous-inbox-os"
+version = "1.0.0"
+source = { editable = "." }
+dependencies = [
+  { name = "fastapi" },
+  { name = "uvicorn" },
+  { name = "pydantic" },
+  { name = "openai" },
+  { name = "requests" },
+  { name = "python-multipart" },
+  { name = "openenv-core" },
+]

@@ -17,6 +17,7 @@ dependencies = [
     "openai>=1.0.0",
     "requests>=2.25.0",
     "python-multipart>=0.0.6",
+    "openenv-core>=0.2.0",
 ]
 
 [project.optional-dependencies]
@@ -25,9 +26,12 @@ dev = [
     "httpx>=0.24.0",
 ]
 
+[project.scripts]
+server = "server.app:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["autonomous_inbox_os*", "server*"]
+include = ["server*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
