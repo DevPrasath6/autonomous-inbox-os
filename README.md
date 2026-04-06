@@ -1,7 +1,7 @@
 ---
 title: Autonomous Inbox OS
 emoji: 📬
-colorFrom: orange
+colorFrom: red
 colorTo: purple
 sdk: docker
 pinned: true
