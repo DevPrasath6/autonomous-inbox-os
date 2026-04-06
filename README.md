@@ -1,18 +1,3 @@
----
-title: Autonomous Inbox OS
-emoji: 📬
-colorFrom: red
-colorTo: purple
-sdk: docker
-pinned: true
-tags:
-  - openenv
-  - email
-  - reinforcement-learning
-  - agent
-  - decision-making
-license: mit
----
 # 📬 Autonomous Inbox OS
 
 > **An AI agent simulation environment where an agent manages a flooded executive inbox under real-world constraints: time pressure, cognitive load, conflicting priorities, and multi-step decision-making.**
