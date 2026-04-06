@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from enum import Enum
 
 
@@ -30,17 +30,17 @@ class EmailObservation(BaseModel):
     pending_urgent: int = 0
     pending_important: int = 0
     user_stress_level: float = Field(ge=0.0, le=1.0, default=0.0)
-    time_remaining: int = 100  # steps remaining in episode
+    time_remaining: int = 100
     step_count: int = 0
 
 
 class EmailAction(BaseModel):
     action_type: ActionType
-    classification: Optional[Priority] = None
-    reply_text: Optional[str] = None
-    escalate_to: Optional[str] = None
-    scheduled_time: Optional[str] = None
-    reasoning: Optional[str] = None  # chain-of-thought
+    classification: Optional[Priority] = Field(default=None)
+    reply_text: Optional[str] = Field(default=None)
+    escalate_to: Optional[str] = Field(default=None)
+    scheduled_time: Optional[str] = Field(default=None)
+    reasoning: Optional[str] = Field(default=None)
 
 
 class EmailReward(BaseModel):
@@ -71,18 +71,18 @@ class TaskDefinition(BaseModel):
     task_id: int
     name: str
     description: str
-    difficulty: str  # easy / medium / hard
-    email_filter: Optional[str] = None  # filter category
+    difficulty: str
+    email_filter: Optional[str] = Field(default=None)
 
 
 class TaskResult(BaseModel):
     task_id: int
-    score: float  # 0.0 - 1.0
+    score: float
     details: Dict[str, Any] = {}
 
 
 class StepResult(BaseModel):
-    observation: Optional[EmailObservation]
+    observation: Optional[EmailObservation] = Field(default=None)
     reward: EmailReward
     done: bool
     info: Dict[str, Any] = {}
