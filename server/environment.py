@@ -10,7 +10,7 @@ from models import (
     EmailObservation, EmailAction, EmailState, EmailReward,
     StepResult, TaskDefinition, TaskResult, ActionType, Priority
 )
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 
 
 TASKS = [
