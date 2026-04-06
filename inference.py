@@ -17,12 +17,12 @@ import time
 import sys
 from openai import OpenAI
 
-# ── Config ──────────────────────────────────────────────────────────────────
+# ── Config ───────────────────────────────────────────────────────────────────
 API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME   = os.environ.get("MODEL_NAME", "gpt-4o-mini")
 HF_TOKEN     = os.environ.get("HF_TOKEN", "")
 MAX_TOKENS   = 512
-TEMPERATURE  = 0.0  # deterministic for reproducibility
+TEMPERATURE  = 0.0
 
 client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
 
@@ -73,48 +73,50 @@ What action do you take?"""
             max_tokens=MAX_TOKENS,
         )
         text = response.choices[0].message.content or "{}"
-        # Strip markdown fences if present
         text = text.strip().strip("```json").strip("```").strip()
         return json.loads(text)
     except Exception as e:
-        print(f"  [Agent error] {e} — using fallback action")
         return {
             "action_type": "archive",
             "classification": "low_priority",
-            "reasoning": "Fallback due to API error."
+            "reasoning": f"Fallback due to API error: {str(e)}"
         }
 
 
-def run_task(task_id: int, env_module) -> dict:
+def run_task(task_id: int) -> dict:
     """Run a full episode for a given task and return grader score."""
     from server.environment import EmailEnvironment
+    from models import EmailAction, ActionType, Priority
 
-    print(f"\n{'='*60}")
-    print(f"  TASK {task_id}: {['', 'Spam Detection', 'Inbox Prioritization', 'Executive Decision-Making'][task_id]}")
-    print(f"  Difficulty: {['', 'Easy', 'Medium', 'Hard'][task_id]}")
-    print(f"{'='*60}")
+    def safe_enum(cls, val, default):
+        try:
+            return cls(val)
+        except Exception:
+            return default
+
+    task_names = {1: "Spam Detection", 2: "Inbox Prioritization", 3: "Executive Decision-Making Under Pressure"}
+    difficulties = {1: "easy", 2: "medium", 3: "hard"}
 
     env = EmailEnvironment(task_id=task_id)
     obs = env.reset()
     obs_dict = obs.model_dump()
+
+    # [START] log — required format
+    print(json.dumps({
+        "event": "START",
+        "task_id": task_id,
+        "task_name": task_names[task_id],
+        "difficulty": difficulties[task_id],
+        "model": MODEL_NAME,
+        "inbox_size": obs_dict.get("inbox_size", 0),
+    }))
 
     step = 0
     total_reward = 0.0
 
     while True:
         step += 1
-        print(f"  Step {step:02d} | 📧 {obs_dict['subject'][:50]}...", end="")
-
         action_dict = call_agent(obs_dict)
-
-        # Build action from agent response
-        from models import EmailAction, ActionType, Priority
-
-        def safe_enum(cls, val, default):
-            try:
-                return cls(val)
-            except Exception:
-                return default
 
         action = EmailAction(
             action_type=safe_enum(ActionType, action_dict.get("action_type"), ActionType.archive),
@@ -125,26 +127,50 @@ def run_task(task_id: int, env_module) -> dict:
         )
 
         result = env.step(action)
-        total_reward += result.reward.total
+        reward = result.reward.total
+        total_reward += reward
 
-        print(f" → {action.action_type.value} | reward: {result.reward.total:+.3f} | stress: {env._stress:.0%}")
+        # [STEP] log — required format
+        print(json.dumps({
+            "event": "STEP",
+            "task_id": task_id,
+            "step": step,
+            "observation": {
+                "email_id": obs_dict.get("email_id"),
+                "subject": obs_dict.get("subject", "")[:60],
+                "sender": obs_dict.get("sender", ""),
+            },
+            "action": {
+                "action_type": action.action_type.value,
+                "classification": action.classification.value if action.classification else None,
+                "reasoning": action.reasoning,
+            },
+            "reward": round(reward, 4),
+            "done": result.done,
+            "stress": round(env._stress, 3),
+        }))
 
         if result.done:
             break
         obs_dict = result.observation.model_dump()
-
-        time.sleep(0.1)  # rate limit safety
+        time.sleep(0.05)
 
     grader = env.run_grader()
-    state = env.state()
 
-    print(f"\n  ✅ Task {task_id} complete")
-    print(f"     Score:           {grader['score']:.4f}")
-    print(f"     Label accuracy:  {grader['details']['label_accuracy']:.1%}")
-    print(f"     Action accuracy: {grader['details']['action_accuracy']:.1%}")
-    print(f"     Missed urgent:   {grader['details']['missed_urgent']}")
-    print(f"     Final stress:    {grader['details']['final_stress']:.0%}")
-    print(f"     Total reward:    {total_reward:+.4f}")
+    # [END] log — required format
+    print(json.dumps({
+        "event": "END",
+        "task_id": task_id,
+        "task_name": task_names[task_id],
+        "difficulty": difficulties[task_id],
+        "steps": step,
+        "total_reward": round(total_reward, 4),
+        "score": grader["score"],
+        "label_accuracy": grader["details"]["label_accuracy"],
+        "action_accuracy": grader["details"]["action_accuracy"],
+        "missed_urgent": grader["details"]["missed_urgent"],
+        "final_stress": grader["details"]["final_stress"],
+    }))
 
     return {
         "task_id": task_id,
@@ -156,40 +182,30 @@ def run_task(task_id: int, env_module) -> dict:
 
 
 def main():
-    print("\n" + "🚀 " * 20)
-    print("  AUTONOMOUS INBOX OS — Baseline Inference")
-    print(f"  Model:    {MODEL_NAME}")
-    print(f"  Base URL: {API_BASE_URL}")
-    print("🚀 " * 20)
-
     import server.environment as env_module
 
     results = []
     for task_id in [1, 2, 3]:
-        result = run_task(task_id, env_module)
+        result = run_task(task_id)
         results.append(result)
 
-    print("\n" + "=" * 60)
-    print("  FINAL SCORES")
-    print("=" * 60)
-    for r in results:
-        bar_len = int(r["score"] * 20)
-        bar = "█" * bar_len + "░" * (20 - bar_len)
-        difficulty = ["", "Easy  ", "Medium", "Hard  "][r["task_id"]]
-        print(f"  Task {r['task_id']} [{difficulty}] [{bar}] {r['score']:.4f}")
-
     avg_score = sum(r["score"] for r in results) / len(results)
-    print(f"\n  Average score: {avg_score:.4f}")
-    print("=" * 60)
 
-    # Write results to file for reproducibility
+    # Final summary
+    print(json.dumps({
+        "event": "SUMMARY",
+        "model": MODEL_NAME,
+        "average_score": round(avg_score, 4),
+        "results": results,
+    }))
+
+    # Save to file
     with open("baseline_scores.json", "w") as f:
         json.dump({
             "model": MODEL_NAME,
             "results": results,
             "average_score": round(avg_score, 4),
         }, f, indent=2)
-    print("\n  📄 Results saved to baseline_scores.json")
 
 
 if __name__ == "__main__":
