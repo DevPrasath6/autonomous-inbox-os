@@ -19,7 +19,7 @@ This environment asks: *"What would a skilled executive assistant DO with this?"
 
 ## 🚀 What This Environment Simulates
 
-**Demo Link - ** https://devv16-autonomous-inbox-os.hf.space/demo
+**Demo Link -**  https://devv16-autonomous-inbox-os.hf.space/demo
 
 **Autonomous Inbox OS** is a real-world decision-making environment where an AI agent must:
 
