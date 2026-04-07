@@ -24,7 +24,7 @@ from openai import OpenAI
 # ── Config ───────────────────────────────────────────────────────────────────
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN     = os.getenv("HF_TOKEN", "")
+HF_TOKEN = os.getenv("HF_TOKEN")
 MAX_TOKENS   = 512
 TEMPERATURE  = 0.0
 BENCHMARK    = "autonomous_inbox_os"
