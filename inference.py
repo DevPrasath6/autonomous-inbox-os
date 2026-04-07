@@ -29,7 +29,12 @@ MAX_TOKENS   = 512
 TEMPERATURE  = 0.0
 BENCHMARK    = "autonomous_inbox_os"
 
-client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
+client = None
+try:
+    if HF_TOKEN:
+        client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
+except Exception:
+    client = None
 
 SYSTEM_PROMPT = """You are an AI executive assistant managing an inbox.
 For each email you receive, respond with a JSON object:
@@ -82,6 +87,13 @@ Has attachment: {observation.get('has_attachment', False)}
 Meeting request: {observation.get('meeting_request', False)}
 
 What action do you take?"""
+
+    if client is None:
+        return {
+            "action_type": "archive",
+            "classification": "low_priority",
+            "reasoning": "Fallback due to missing or invalid API configuration"
+        }
 
     try:
         response = client.chat.completions.create(
@@ -140,9 +152,10 @@ def run_task(task_id: int) -> dict:
             action = EmailAction(
                 action_type=safe_enum(ActionType, action_dict.get("action_type"), ActionType.archive),
                 classification=safe_enum(Priority, action_dict.get("classification"), Priority.low_priority),
-                reply_text=action_dict.get("reply_text"),
-                escalate_to=action_dict.get("escalate_to"),
-                reasoning=action_dict.get("reasoning"),
+                reply_text=action_dict.get("reply_text", ""),
+                escalate_to=action_dict.get("escalate_to", ""),
+                scheduled_time=action_dict.get("scheduled_time", ""),
+                reasoning=action_dict.get("reasoning", ""),
             )
 
             result = env.step(action)
