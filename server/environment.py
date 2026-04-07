@@ -26,14 +26,14 @@ TASKS = [
         name="Inbox Prioritization",
         description="Classify all emails by priority (urgent/important/low_priority/spam) and take the correct action for each.",
         difficulty="medium",
-        email_filter=""
+        email_filter=None
     ),
     TaskDefinition(
         task_id=3,
         name="Executive Decision-Making Under Pressure",
         description="Handle a flooded inbox with conflicting priorities, urgent deadlines, and time pressure. Agent must classify, reply, escalate, and schedule while managing stress levels.",
         difficulty="hard",
-        email_filter=""
+        email_filter=None
     ),
 ]
 
@@ -231,7 +231,7 @@ class EmailEnvironment:
         return (taken, correct) in compatible
 
     def _score_reply(self, reply_text: str, email: Dict) -> float:
-        score = 0.0
+        score = 0.1  # start with small base score
         reply_lower = reply_text.lower()
         # Check relevance signals
         if any(word in reply_lower for word in ["thank", "acknowledge", "received"]):
@@ -242,7 +242,7 @@ class EmailEnvironment:
             score += 0.4
         if email["category"] == "client" and any(w in reply_lower for w in ["proposal", "discuss", "call", "forward"]):
             score += 0.4
-        return min(1.0, score)
+        return min(0.99, score)
 
     def _build_observation(self) -> EmailObservation:
         if self._index >= len(self._emails):
@@ -285,8 +285,7 @@ class EmailEnvironment:
         """Run the programmatic grader for completed episode.
         Score is strictly between 0.0 and 1.0 (exclusive) as required."""
         if not self._predictions:
-            # Return a small non-zero score so it's never exactly 0.0
-            return {"score": 0.05, "details": {"emails_processed": 0}}
+            return {"score": 0.05, "details": {"emails_processed": 0, "label_accuracy": 0.05, "action_accuracy": 0.05, "missed_urgent": 0, "final_stress": 0.0, "cumulative_reward": 0.0, "avg_reward_per_step": 0.0}}
 
         n = len(self._predictions)
         correct_labels = sum(1 for p in self._predictions if p["expected_label"] == p["predicted_label"])
@@ -308,7 +307,19 @@ class EmailEnvironment:
         ) - urgent_penalty * 0.2
 
         # Strictly between 0 and 1 — never exactly 0.0 or 1.0
+        # Add small epsilon to prevent boundary values
         score = max(0.01, min(0.99, raw))
+        # Double-check: ensure never exactly 0 or 1
+        if score <= 0.0:
+            score = 0.01
+        if score >= 1.0:
+            score = 0.99
+        # Round to 4 decimal places but ensure not boundary
+        score = round(score, 4)
+        if score == 0.0:
+            score = 0.0001
+        if score == 1.0:
+            score = 0.9999
 
         return {
             "score": round(score, 4),
