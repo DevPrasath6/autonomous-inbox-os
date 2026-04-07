@@ -132,7 +132,20 @@ class EmailEnvironment:
         done = self._index >= len(self._emails) or self._time_remaining <= 0
         self._done = done
 
-        obs = None if done else self._build_observation()
+        obs = self._build_observation() if not done else EmailObservation(
+            email_id=-1,
+            subject="",
+            body="",
+            sender="",
+            has_attachment=False,
+            meeting_request=False,
+            inbox_size=0,
+            pending_urgent=0,
+            pending_important=0,
+            user_stress_level=round(self._stress, 3),
+            time_remaining=max(0, self._time_remaining),
+            step_count=self._step_count,
+        )
         return StepResult(observation=obs, reward=reward, done=done, info={
             "email_id": email["id"],
             "correct_action": email["expected_action"],
