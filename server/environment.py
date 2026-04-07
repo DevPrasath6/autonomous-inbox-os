@@ -10,7 +10,7 @@ from models import (
     EmailObservation, EmailAction, EmailState, EmailReward,
     StepResult, TaskDefinition, TaskResult, ActionType, Priority
 )
-from typing import List, Dict, Any
+from typing import Optional, List, Dict, Any
 
 
 TASKS = [
@@ -26,14 +26,14 @@ TASKS = [
         name="Inbox Prioritization",
         description="Classify all emails by priority (urgent/important/low_priority/spam) and take the correct action for each.",
         difficulty="medium",
-        email_filter=""
+        email_filter=None
     ),
     TaskDefinition(
         task_id=3,
         name="Executive Decision-Making Under Pressure",
         description="Handle a flooded inbox with conflicting priorities, urgent deadlines, and time pressure. Agent must classify, reply, escalate, and schedule while managing stress levels.",
         difficulty="hard",
-        email_filter=""
+        email_filter=None
     ),
 ]
 
@@ -282,9 +282,11 @@ class EmailEnvironment:
         return TASKS
 
     def run_grader(self) -> Dict[str, Any]:
-        """Run the programmatic grader for completed episode."""
+        """Run the programmatic grader for completed episode.
+        Score is strictly between 0.0 and 1.0 (exclusive) as required."""
         if not self._predictions:
-            return {"score": 0.0, "details": {}}
+            # Return a small non-zero score so it's never exactly 0.0
+            return {"score": 0.05, "details": {"emails_processed": 0}}
 
         n = len(self._predictions)
         correct_labels = sum(1 for p in self._predictions if p["expected_label"] == p["predicted_label"])
@@ -294,10 +296,10 @@ class EmailEnvironment:
 
         label_accuracy = correct_labels / n
         action_accuracy = correct_actions / n
-        urgent_penalty = min(1.0, missed_urgent * 0.25)
+        urgent_penalty = min(0.9, missed_urgent * 0.25)
         stress_factor = 1.0 - self._stress * 0.3
 
-        # Weighted final score 0.0–1.0
+        # Weighted final score — clamped to strictly (0.0, 1.0)
         raw = (
             label_accuracy * 0.35
             + action_accuracy * 0.35
@@ -305,7 +307,8 @@ class EmailEnvironment:
             + min(1.0, (avg_reward + 1.0) / 2.0) * 0.1
         ) - urgent_penalty * 0.2
 
-        score = max(0.0, min(1.0, raw))
+        # Strictly between 0 and 1 — never exactly 0.0 or 1.0
+        score = max(0.01, min(0.99, raw))
 
         return {
             "score": round(score, 4),
