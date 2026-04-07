@@ -104,8 +104,7 @@ def demo():
     return FileResponse(os.path.join(_static_dir, "index.html"))
 
 
-@app.api_route("/reset", methods=["GET", "POST", "PUT", "OPTIONS"])
-async def reset(request: Request):
+async def _reset_impl(request: Request):
     global _env, _metrics_log
     task_id = 2
     try:
@@ -148,8 +147,27 @@ async def reset(request: Request):
     })
 
 
-@app.api_route("/step", methods=["POST", "PUT"])
-async def step(request: Request):
+@app.get("/reset", operation_id="reset_get")
+async def reset_get(request: Request):
+    return await _reset_impl(request)
+
+
+@app.post("/reset", operation_id="reset_post")
+async def reset_post(request: Request):
+    return await _reset_impl(request)
+
+
+@app.put("/reset", operation_id="reset_put")
+async def reset_put(request: Request):
+    return await _reset_impl(request)
+
+
+@app.options("/reset", operation_id="reset_options")
+async def reset_options(request: Request):
+    return await _reset_impl(request)
+
+
+async def _step_impl(request: Request):
     global _metrics_log
     try:
         body = await request.json()
@@ -175,6 +193,16 @@ async def step(request: Request):
         })
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/step", operation_id="step_post")
+async def step_post(request: Request):
+    return await _step_impl(request)
+
+
+@app.put("/step", operation_id="step_put")
+async def step_put(request: Request):
+    return await _step_impl(request)
 
 
 @app.get("/state")
@@ -210,8 +238,7 @@ def metrics():
     })
 
 
-@app.api_route("/simulate", methods=["GET", "POST"])
-async def simulate(request: Request):
+async def _simulate_impl(request: Request):
     import random
     from models import ActionType, Priority
     task_id = 2
@@ -246,6 +273,16 @@ async def simulate(request: Request):
         "grader_score": grader_result["score"],
         "details": grader_result["details"],
     })
+
+
+@app.get("/simulate", operation_id="simulate_get")
+async def simulate_get(request: Request):
+    return await _simulate_impl(request)
+
+
+@app.post("/simulate", operation_id="simulate_post")
+async def simulate_post(request: Request):
+    return await _simulate_impl(request)
 
 
 def main():
