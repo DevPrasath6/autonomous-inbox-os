@@ -5,3 +5,4 @@ openai>=1.0.0
 requests>=2.25.0
 python-multipart>=0.0.6
 openenv-core>=0.2.0
+# Force rebuild Tue, Apr  7, 2026  9:43:08 AM
