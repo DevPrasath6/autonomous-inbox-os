@@ -26,14 +26,14 @@ TASKS = [
         name="Inbox Prioritization",
         description="Classify all emails by priority (urgent/important/low_priority/spam) and take the correct action for each.",
         difficulty="medium",
-        email_filter=None
+        email_filter=""
     ),
     TaskDefinition(
         task_id=3,
         name="Executive Decision-Making Under Pressure",
         description="Handle a flooded inbox with conflicting priorities, urgent deadlines, and time pressure. Agent must classify, reply, escalate, and schedule while managing stress levels.",
         difficulty="hard",
-        email_filter=None
+        email_filter=""
     ),
 ]
 
